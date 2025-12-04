@@ -12,51 +12,47 @@
 - **可配置化**：以 `config/*.yaml` 管理特徵欄位、標籤對映、模型超參數（層數、寬度、Dropout、L2、學習率、批次大小、Epochs 等）。  
 - **多種評估指標**：`accuracy`、`precision/recall/f1 (macro/weighted)`、混淆矩陣、ROC-AUC（多類 One-vs-Rest）。  
 - **產物可追溯**：自動保存 `runs/`（權重、最佳檢查點、學習曲線、指標報表、confusion matrix PNG、分類報告）。  
-- **易於部署**：提供 `inference.py` 與 `serve.py`（可選）進行離線批次或簡易 API 服務。
 
 ---
 
-## 專案結構（建議）
-
-> 下列為建議結構；若你的 repo 已有不同命名，請以實際檔名為準。
+## 專案結構
 
 ```
 mlp_player_classifier/
 ├─ config/
 │  ├─ experiment_default.yaml       # 模型與訓練參數、特徵清單、標籤對映
-│  └─ cluster_to_label.yaml         # （可選）從 K-Means Cluster 映射到最終玩家類型
+│  └─ cluster_to_label.yaml         # 從 K-Means Cluster 映射到最終玩家類型
 ├─ data/
 │  ├─ train/                        # 訓練資料（CSV/Parquet）
 │  ├─ valid/                        # 驗證資料
 │  └─ test/                         # 測試資料
 ├─ src/
 │  ├─ dataset.py                    # 資料讀取/切分/標準化
-│  ├─ features.py                   # 特徵工程與前處理（Winsor/Scaler/Log 等）
-│  ├─ model.py                      # MLP 架構定義（PyTorch 或 scikit-learn MLPClassifier）
+│  ├─ features.py                   # 特徵工程與前處理
+│  ├─ model.py                      # MLP 架構定義
 │  ├─ trainer.py                    # 訓練/早停/儲存最佳模型
 │  ├─ metrics.py                    # 評估與報表輸出
 │  ├─ infer.py                      # 單批/單檔推論工具
-│  └─ utils.py                      # 公用函式（隨機種子、路徑、記錄器）
+│  └─ utils.py                      # 公用函式
 ├─ notebooks/                       # Demo 與探索式分析
-├─ runs/                            # 訓練輸出（自動建立）
-├─ requirements.txt                 # 相依套件（可用下方最小清單）
+├─ runs/                            # 訓練輸出
+├─ requirements.txt                 # 相依套件
 ├─ train.py                         # CLI：執行訓練/評估
 ├─ inference.py                     # CLI：批次推論
-├─ serve.py                         # （可選）簡易 API 服務（FastAPI/Flask）
 ├─ README.md                        # 本說明文件
-└─ LICENSE                          # 授權（建議：Apache-2.0）
+└─ LICENSE                          # 授權
 ```
 
 ---
 
 ## 安裝與環境
 
-- Python 3.10+（建議）
-- 最小相依（若使用 PyTorch 版）
+- Python 3.10+
+- 最小相依
   ```bash
   pip install -U pandas numpy scikit-learn torch torchvision torchaudio matplotlib pyyaml joblib
   ```
-  或（若使用 scikit-learn `MLPClassifier` 版本）
+  或
   ```bash
   pip install -U pandas numpy scikit-learn matplotlib pyyaml joblib
   ```
@@ -71,7 +67,7 @@ mlp_player_classifier/
   - `player_id, ts_window_start`（或 `ts`）、多個行為特徵欄位（如：`blocks_placed, blocks_broken, chunk_loads, tnt_exploded, entity_kills, items_picked, items_dropped, container_interactions, chat_count, afk_minutes, active_minutes, ...`）
   - `label`（字串或整數類別編碼）。若無標籤，可先由 `2026TISF_Kmeans` 產生弱標籤。
 
-### 標籤範例（建議）
+### 標籤範例
 ```yaml
 # config/cluster_to_label.yaml
 0: "Builder"      # 建築玩家
@@ -164,13 +160,9 @@ uvicorn serve:app --host 0.0.0.0 --port 8000
 
 - 主要輸出皆置於 `runs/exp*/`：
   - `best.ckpt` / `best_model.joblib`（模型權重）
-  - `metrics.json`（accuracy、macro/weighted F1 等）
+  - `metrics.json`
   - `confusion_matrix.png`、`learning_curve.png`
   - `classification_report.txt`
-- 建議在 README 或論文中同步回報：
-  - 交叉驗證結果（K-fold）與標準差
-  - 不同特徵組/前處理對結果的影響
-  - 與基準模型（僅用玩家人數、或簡單規則）的比較
 
 ---
 
@@ -202,3 +194,4 @@ uvicorn serve:app --host 0.0.0.0 --port 8000
 - [ ] 支援 `ONNX` 匯出與推論。
 
 ---
+
