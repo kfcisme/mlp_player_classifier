@@ -19,16 +19,15 @@ def softmax(z):
 
 def main():
     C = yaml.safe_load(open("config.yaml","r",encoding="utf-8"))
-    # 載入 ckpt 資訊
+    # input ckpt
     import torch
     ckpt = torch.load("best.pt", map_location="cpu")
     feat_cols = ckpt["feat_cols"]
     classes = ckpt["classes"]
 
-    # 載入 ONNX
+    # ONNX
     sess = ort.InferenceSession(C["export"]["onnx_path"], providers=["CPUExecutionProvider"])
 
-    # 假設有一個新時段的資料 new.csv（同 schema）
     df_new = pd.read_csv("data/new.csv")
     df_new = build_preprocess(df_new, C, feat_cols)
     X = df_new[feat_cols].to_numpy(np.float32)
@@ -38,7 +37,6 @@ def main():
     df_new["pred_label"] = [classes[i] for i in pred_idx]
     df_new["pred_conf"] = prob.max(1)
 
-    # 可選：低信心標 Unknown
     df_new["final_label"] = np.where(df_new["pred_conf"]>=0.55, df_new["pred_label"], "Unknown")
     df_new.to_csv("data/new_with_preds.csv", index=False)
     print("Saved to data/new_with_preds.csv")

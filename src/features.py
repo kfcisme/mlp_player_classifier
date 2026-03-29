@@ -3,7 +3,6 @@ import pandas as pd
 
 def add_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    # 衍生 AFK_ratio & active_minutes
     df["AFK_ratio"] = df["afktime"] / 1800.0
     df["active_minutes"] = np.maximum(0.0, 30.0 - df["afktime"] / 60.0)
     return df

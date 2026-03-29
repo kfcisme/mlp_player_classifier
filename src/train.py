@@ -25,11 +25,9 @@ from sklearn.model_selection import GroupShuffleSplit, train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import classification_report, confusion_matrix
 
-# --------------------------
-# 超參數（可視需要調整；若有 config.yaml 也可自行改成讀 yaml）
-# --------------------------
+
 RANDOM_SEED = 42
-DATA_PATH = Path("data/samples.csv")  # 由 build_samples.py 產生
+DATA_PATH = Path("data/samples.csv")
 LABEL_COL = "label"
 GROUP_COL = "player_id"
 
@@ -37,7 +35,7 @@ BATCH_SIZE = 512
 NUM_EPOCHS = 80
 EARLY_STOP_PATIENCE = 10
 NUM_WORKERS = 4
-MIXED_PRECISION = True  # 若沒有 GPU 自動無效
+MIXED_PRECISION = True
 
 HIDDEN_SIZES = (256, 128, 64)
 DROPOUT = 0.15
@@ -50,9 +48,7 @@ COSINE_TMAX = 40
 
 BEST_CKPT = "best.pt"
 
-# --------------------------
-# 小工具
-# --------------------------
+
 def set_seed(seed: int):
     random.seed(seed)
     np.random.seed(seed)
@@ -76,7 +72,6 @@ class MLP(nn.Module):
         return self.net(x)  # logits
 
 def auto_feature_columns(df: pd.DataFrame) -> list[str]:
-    """抓所有 rate_* 與 dist_*；若存在也納入 _cluster/pmax/min_dist/dist_to_assigned/AFK_ratio/active_minutes。"""
     feats = [c for c in df.columns if c.startswith("rate_") or c.startswith("dist_")]
     for extra in ["_cluster", "pmax", "min_dist", "dist_to_assigned", "AFK_ratio", "active_minutes"]:
         if extra in df.columns and extra not in feats:
@@ -86,18 +81,17 @@ def auto_feature_columns(df: pd.DataFrame) -> list[str]:
         if non in feats:
             feats.remove(non)
     if not feats:
-        raise RuntimeError("找不到可用特徵欄位（rate_* / dist_* 等）。請檢查 data/samples.csv。")
+        raise RuntimeError("CANT FIND FEATRUES（rate_* / dist_* ）, NEED CHECK  data/samples.csv。")
     return feats
 
 def group_train_val_test_split(df: pd.DataFrame, group_col: str, test_ratio=0.2, val_ratio_of_train=0.15, seed=42):
-    """先依 group 切出 test；再在 train 部分切出 val（可用 stratify）。"""
     gss = GroupShuffleSplit(n_splits=1, test_size=test_ratio, random_state=seed)
     groups = df[group_col].astype(str)
     idx_tr, idx_te = next(gss.split(df, groups=groups))
     df_tr_full = df.iloc[idx_tr].copy()
     df_te = df.iloc[idx_te].copy()
 
-    # 再從訓練集切出驗證集（用標籤做 stratify 以保持比例）
+
     df_tr, df_va = train_test_split(
         df_tr_full,
         test_size=val_ratio_of_train,
@@ -115,31 +109,28 @@ def build_loaders(X_train, y_train, X_val, y_val, X_test, y_test, batch_size, nu
     dl_te = DataLoader(ds_te, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True)
     return dl_tr, dl_va, dl_te
 
-# --------------------------
-# 主流程
-# --------------------------
+
 def main():
     set_seed(RANDOM_SEED)
 
     # 讀資料
     if not DATA_PATH.exists():
-        raise FileNotFoundError(f"找不到 {DATA_PATH}，請先執行 src/build_samples.py")
+        raise FileNotFoundError(f"CANT find {DATA_PATH}, run src/build_samples.py first")
     df = pd.read_csv(DATA_PATH)
 
-    # 檢查必要欄
+    # 檢查
     for col in [LABEL_COL, GROUP_COL]:
         if col not in df.columns:
-            raise KeyError(f"samples.csv 缺少必要欄位：{col}")
+            raise KeyError(f"samples.csv missing colum{col}")
 
-    # 自動抓特徵欄位
     feat_cols = auto_feature_columns(df)
 
-    # Label 編碼
+    # Label
     le = LabelEncoder()
     y_all = le.fit_transform(df[LABEL_COL].astype(str))
     classes = list(le.classes_)
 
-    # Group 切分
+    # Group
     df_tr, df_va, df_te = group_train_val_test_split(
         df, group_col=GROUP_COL, test_ratio=0.2, val_ratio_of_train=0.15, seed=RANDOM_SEED
     )
@@ -166,9 +157,9 @@ def main():
         activation=ACTIVATION,
     ).to(device)
 
-    # 類別權重（balanced）
     _, counts = np.unique(y_all, return_counts=True)
-    class_w = (counts.sum() / (len(counts) * counts)).astype(np.float32)  # 1/freq 正規化
+    # 正規化
+    class_w = (counts.sum() / (len(counts) * counts)).astype(np.float32)
     criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_w, device=device))
 
     opt = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
@@ -179,7 +170,7 @@ def main():
     bad = 0
 
     for epoch in range(1, NUM_EPOCHS + 1):
-        # ---- Train ----
+        # Train
         model.train()
         tr_loss_sum, tr_correct, tr_total = 0.0, 0, 0
         for xb, yb in dl_tr:
@@ -200,7 +191,6 @@ def main():
         train_acc = tr_correct / tr_total
         train_loss = tr_loss_sum / tr_total
 
-        # ---- Valid ----
         model.eval()
         va_loss_sum, va_correct, va_total = 0.0, 0, 0
         with torch.no_grad():
@@ -218,7 +208,7 @@ def main():
         print(f"[E{epoch:03d}] train_acc={train_acc:.4f} val_acc={val_acc:.4f} "
               f"loss(tr/va)={train_loss:.4f}/{val_loss:.4f}")
 
-        # Early stopping on val_acc
+        # Early stopping
         if val_acc > best_val:
             best_val = val_acc
             bad = 0
@@ -231,7 +221,7 @@ def main():
                 print("Early stopping.")
                 break
 
-    # ---- Test ----
+    # test case
     ckpt = torch.load(BEST_CKPT, map_location=device)
     model.load_state_dict(ckpt["model"])
     model.eval()
@@ -247,7 +237,7 @@ def main():
     all_y = np.concatenate(all_y, axis=0)
     preds = all_logits.argmax(1)
 
-    print("\n=== Test report ===")
+    print("\n Test report \n")
     print(classification_report(all_y, preds, target_names=classes))
     print("Confusion matrix:")
     print(confusion_matrix(all_y, preds))
